@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI SQL Analyst</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --paper: #e9eef0; --panel: #f7f9fa; --ink: #14212b; --muted: #5b6b77;
+    --line: #cfd8dd; --teal: #0b6e6e; --amber: #f2b84b; --navy: #14212b; --error: #a4262c;
+    --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.55 var(--sans); }
+  [hidden] { display: none !important; }
+  input:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+  input[type=text], input[type=password] { width: 100%; padding: 11px 13px; font: inherit; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); }
+  .primary { padding: 11px 22px; font: 600 15px var(--sans); border: 0; border-radius: 6px; background: var(--teal); color: #fff; cursor: pointer; }
+  .primary:disabled { opacity: .6; cursor: wait; }
+  .ghost { padding: 7px 14px; font: 500 13px var(--sans); background: var(--panel); color: var(--teal); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+  .ghost:disabled { opacity: .6; }
+
+  /* sign-in */
+  .authwrap { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+  .authcard { width: min(380px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 28px; }
+  .authcard h1 { font-size: 20px; margin: 0 0 4px; }
+  .authcard p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+  .authcard label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: 14px; }
+  .authbtns { display: flex; gap: 10px; margin-top: 20px; }
+
+  /* app */
+  .app { display: grid; grid-template-columns: 270px 1fr; min-height: 100vh; }
+  aside { background: var(--navy); color: #d6e0e6; padding: 22px 18px; overflow-y: auto; }
+  aside h1 { font-size: 17px; font-weight: 600; margin: 0 0 4px; color: #fff; }
+  aside .sub { margin: 0 0 18px; font-size: 13px; color: #8fa3b0; }
+  aside h3 { font-size: 12px; font-weight: 600; color: #8fa3b0; margin: 22px 0 6px; }
+  .table-name { font: 500 13px var(--mono); color: var(--amber); margin: 12px 0 4px; }
+  .col { display: flex; justify-content: space-between; gap: 8px; font: 12px var(--mono); padding: 1px 0; color: #c3d0d8; }
+  .col span:last-child { color: #7d91a0; }
+  .hist { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid #243543; color: #c3d0d8; padding: 7px 2px; font: 13px var(--sans); cursor: pointer; }
+  .hist:hover { color: #fff; }
+  .hist small { color: #7d91a0; margin-left: 6px; }
+  .quiet { color: #7d91a0; font-size: 13px; }
+  main { padding: 24px clamp(16px, 4vw, 48px); max-width: 1000px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; font-size: 14px; color: var(--muted); }
+  .topbar div { display: flex; gap: 8px; align-items: center; }
+  label.q { display: block; font-weight: 600; margin-bottom: 8px; }
+  .ask { display: flex; gap: 10px; }
+  .modes { display: flex; gap: 18px; margin: 12px 0 0; font-size: 14px; }
+  .modes label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .modes small { color: var(--muted); }
+  .examples { margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  section { margin-top: 26px; }
+  h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 600; }
+  pre { margin: 0; padding: 16px; background: var(--navy); color: var(--amber); font: 13.5px/1.6 var(--mono); border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }
+  .scroll { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-weight: 600; background: #e1e8eb; }
+  tr:last-child td { border-bottom: 0; }
+  .insight { padding: 14px 16px; background: var(--panel); border-left: 4px solid var(--teal); border-radius: 0 6px 6px 0; white-space: pre-wrap; }
+  .error { padding: 14px 16px; background: #fbeaea; border-left: 4px solid var(--error); border-radius: 0 6px 6px 0; color: var(--error); }
+  .note { margin-top: 10px; padding: 10px 14px; background: #fff6e0; border-left: 4px solid var(--amber); border-radius: 0 6px 6px 0; font-size: 14px; }
+  .tools { display: flex; gap: 8px; margin-top: 10px; }
+  .tip { margin-top: 12px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; white-space: pre-wrap; }
+  .chartbox { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; height: 320px; }
+  details { margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .step { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .step b { font-family: var(--mono); font-size: 13px; color: var(--teal); }
+  .step pre { margin-top: 6px; font-size: 12.5px; color: #d6e0e6; max-height: 220px; }
+  @media (max-width: 760px) { .app { grid-template-columns: 1fr; } .ask { flex-direction: column; } }
+</style>
+</head>
+<body>
+
+<div class="authwrap" id="authView" hidden>
+  <div class="authcard">
+    <h1>AI SQL Analyst</h1>
+    <p>Sign in to ask your database questions.</p>
+    <label for="u">Username</label>
+    <input id="u" type="text" autocomplete="username">
+    <label for="p">Password</label>
+    <input id="p" type="password" autocomplete="current-password" placeholder="At least 8 characters">
+    <div class="authbtns">
+      <button class="primary" id="btnLogin">Sign in</button>
+      <button class="ghost" id="btnRegister">Create account</button>
+    </div>
+    <div class="error" id="authErr" hidden style="margin-top:16px"></div>
+  </div>
+</div>
+
+<div class="app" id="appView" hidden>
+  <aside>
+    <h1>AI SQL Analyst</h1>
+    <p class="sub">Ask your database in plain English.</p>
+    <h3>Tables</h3>
+    <div id="schema"><span class="quiet">Loading tables…</span></div>
+    <h3>Recent questions</h3>
+    <div id="history"><span class="quiet">Nothing yet.</span></div>
+    <button class="ghost" id="btnClear" style="margin-top:12px" hidden>Clear history</button>
+  </aside>
+  <main>
+    <div class="topbar">
+      <span id="convLabel">New conversation</span>
+      <div><span id="who"></span><button class="ghost" id="btnNew">New conversation</button><button class="ghost" id="btnOut">Sign out</button></div>
+    </div>
+
+    <label class="q" for="q">Your question</label>
+    <div class="ask">
+      <input id="q" type="text" placeholder="Which department has the highest average salary?" autocomplete="off">
+      <button class="primary" id="go">Run</button>
+    </div>
+    <div class="modes">
+      <label><input type="radio" name="mode" value="quick" checked> Quick query <small>one SQL query</small></label>
+      <label><input type="radio" name="mode" value="agent"> Deep analysis <small>runs several queries and explains</small></label>
+    </div>
+    <div class="examples" id="examples"></div>
+
+    <section id="err" hidden><div class="error" id="errText"></div></section>
+    <section id="ansBox" hidden><h2>Answer</h2><div class="insight" id="answer"></div><div id="steps"></div></section>
+    <section id="sqlBox" hidden>
+      <h2>Generated SQL</h2><pre id="sql"></pre>
+      <div class="note" id="repairNote" hidden></div>
+      <div class="tools">
+        <button class="ghost" id="btnExplain">Explain this query</button>
+        <button class="ghost" id="btnOptimize">Suggest optimizations</button>
+      </div>
+      <div class="tip" id="explainOut" hidden></div>
+      <div class="tip" id="optimizeOut" hidden></div>
+    </section>
+    <section id="chartBox" hidden><h2>Chart</h2><div class="chartbox"><canvas id="chart"></canvas></div></section>
+    <section id="resBox" hidden><h2 id="resTitle">Results</h2><div class="scroll"><table id="table"></table></div></section>
+    <section id="insBox" hidden><h2>What the data shows</h2><div class="insight" id="insight"></div></section>
+  </main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let token = localStorage.getItem("sqla_token"), convId = null, chartInstance = null;
+const mode = () => document.querySelector('input[name="mode"]:checked').value;
+
+async function api(url, opts = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = "Bearer " + token;
+  const r = await fetch(url, { ...opts, headers });
+  let d = {}; try { d = await r.json(); } catch {}
+  if (r.status === 401 && !url.includes("/auth/")) { signOut(); throw new Error(d.detail || "Sign in to continue."); }
+  if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "Something went wrong.");
+  return d;
+}
+
+/* ---------- sign in / out ---------- */
+async function authenticate(kind) {
+  $("authErr").hidden = true;
+  try {
+    const d = await api("/api/auth/" + kind, { method: "POST", body: JSON.stringify({ username: $("u").value.trim(), password: $("p").value }) });
+    token = d.token; localStorage.setItem("sqla_token", token); $("p").value = ""; enter(d.username);
+  } catch (e) { $("authErr").textContent = e.message; $("authErr").hidden = false; }
+}
+function enter(username) {
+  $("authView").hidden = true; $("appView").hidden = false; $("who").textContent = username;
+  loadSchema(); loadHistory();
+}
+function signOut() {
+  token = null; convId = null; localStorage.removeItem("sqla_token");
+  $("appView").hidden = true; $("authView").hidden = false;
+}
+$("btnLogin").onclick = () => authenticate("login");
+$("btnRegister").onclick = () => authenticate("register");
+$("p").addEventListener("keydown", e => { if (e.key === "Enter") authenticate("login"); });
+$("btnOut").onclick = signOut;
+
+/* ---------- sidebar ---------- */
+async function loadSchema() {
+  try {
+    const s = await api("/api/schema");
+    $("schema").innerHTML = Object.entries(s).map(([t, cols]) =>
+      `<div class="table-name">${esc(t)}</div>` +
+      cols.map(c => `<div class="col"><span>${esc(c.name)}</span><span>${esc(c.type.toLowerCase())}</span></div>`).join("")).join("");
+  } catch (e) { $("schema").innerHTML = `<span class="quiet">${esc(e.message)}</span>`; }
+}
+async function loadHistory() {
+  try {
+    const h = await api("/api/history");
+    $("btnClear").hidden = !h.length;
+    $("history").innerHTML = h.length ? "" : '<span class="quiet">Nothing yet.</span>';
+    h.slice(0, 15).forEach(item => {
+      const b = document.createElement("button");
+      b.className = "hist";
+      b.innerHTML = esc(item.question.length > 44 ? item.question.slice(0, 44) + "…" : item.question) + `<small>${item.mode === "agent" ? "deep" : "quick"}</small>`;
+      b.onclick = () => { $("q").value = item.question; $("q").focus(); };
+      $("history").appendChild(b);
+    });
+  } catch {}
+}
+$("btnClear").onclick = async () => { await api("/api/history", { method: "DELETE" }); loadHistory(); };
+$("btnNew").onclick = () => { convId = null; $("convLabel").textContent = "New conversation"; hideResults(); $("q").value = ""; $("q").focus(); };
+
+["Show average salary by department", "Who are the top 5 highest paid employees?", "Why is the IT average salary higher than HR?"].forEach(t => {
+  const b = document.createElement("button"); b.className = "ghost"; b.textContent = t;
+  b.onclick = () => { $("q").value = t; ask(); }; $("examples").appendChild(b);
+});
+
+/* ---------- rendering ---------- */
+function hideResults() { ["err", "ansBox", "sqlBox", "chartBox", "resBox", "insBox"].forEach(id => $(id).hidden = true); }
+
+function showSql(sql, repairs) {
+  if (!sql) { $("sqlBox").hidden = true; return; }
+  $("sql").textContent = sql; $("sqlBox").hidden = false;
+  $("explainOut").hidden = true; $("optimizeOut").hidden = true;
+  if (repairs && repairs.length) {
+    $("repairNote").textContent = `The first query failed (${repairs[0].error}). It was fixed automatically.`; $("repairNote").hidden = false;
+  } else $("repairNote").hidden = true;
+}
+function showData(d) {
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  $("chartBox").hidden = true; $("resBox").hidden = true;
+  if (!d.columns || !d.columns.length) return;
+  $("resTitle").textContent = `Results (${d.rows.length} row${d.rows.length === 1 ? "" : "s"})`;
+  $("table").innerHTML = "<tr>" + d.columns.map(c => `<th>${esc(c)}</th>`).join("") + "</tr>" +
+    d.rows.map(r => "<tr>" + r.map(v => `<td>${esc(v)}</td>`).join("") + "</tr>").join("");
+  $("resBox").hidden = false;
+  if (d.chart) {
+    const xi = d.columns.indexOf(d.chart.x), yi = d.columns.indexOf(d.chart.y);
+    $("chartBox").hidden = false;
+    chartInstance = new Chart($("chart"), {
+      type: d.chart.type,
+      data: { labels: d.rows.map(r => r[xi]), datasets: [{ label: d.chart.y, data: d.rows.map(r => Number(r[yi])),
+        backgroundColor: "#0b6e6e", borderColor: "#0b6e6e", borderWidth: 2, tension: 0.25 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, title: { display: true, text: d.chart.y } }, x: { title: { display: true, text: d.chart.x } } } }
+    });
+  }
+}
+function showSteps(steps) {
+  if (!steps || !steps.length) { $("steps").innerHTML = ""; return; }
+  $("steps").innerHTML = `<details><summary>How it got there (${steps.length} step${steps.length === 1 ? "" : "s"})</summary>` +
+    steps.map(s => `<div class="step"><b>${esc(s.tool)}</b> ${esc(s.thought)}` +
+      (s.args && s.args.sql ? `<pre>${esc(s.args.sql)}</pre>` : s.args && s.args.query ? `<pre>${esc(s.args.query)}</pre>` : "") +
+      (s.observation ? `<pre>${esc(s.observation)}</pre>` : "") + `</div>`).join("") + "</details>";
+}
+
+async function ask() {
+  const question = $("q").value.trim();
+  if (!question) return;
+  $("go").disabled = true; $("go").textContent = "Running…"; hideResults();
+  try {
+    const agent = mode() === "agent";
+    const d = await api(agent ? "/api/agent" : "/api/ask", { method: "POST", body: JSON.stringify({ question, conversation_id: convId }) });
+    convId = d.conversation_id; $("convLabel").textContent = "Conversation in progress — follow-up questions are remembered";
+    if (agent) {
+      $("answer").textContent = d.answer; $("ansBox").hidden = false; showSteps(d.steps);
+      showSql(d.queries.length ? d.queries[d.queries.length - 1] : null); showData(d);
+    } else {
+      showSql(d.sql, d.repairs); showData(d); $("steps").innerHTML = "";
+      if (d.insight) { $("insight").textContent = d.insight; $("insBox").hidden = false; }
+    }
+    loadHistory();
+  } catch (e) { hideResults(); $("errText").textContent = e.message; $("err").hidden = false; }
+  finally { $("go").disabled = false; $("go").textContent = "Run"; }
+}
+$("go").onclick = ask;
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
+
+async function tool(url, btn, out, pick) {
+  const label = btn.textContent; btn.disabled = true; btn.textContent = "Working…";
+  try { const d = await api(url, { method: "POST", body: JSON.stringify({ sql: $("sql").textContent }) }); out.textContent = pick(d); }
+  catch (e) { out.textContent = e.message; }
+  out.hidden = false; btn.disabled = false; btn.textContent = label;
+}
+$("btnExplain").onclick = () => tool("/api/explain", $("btnExplain"), $("explainOut"), d => d.explanation);
+$("btnOptimize").onclick = () => tool("/api/optimize", $("btnOptimize"), $("optimizeOut"), d => d.suggestions + "\n\nEXPLAIN output:\n" + d.plan);
+
+/* ---------- start ---------- */
+if (token) api("/api/auth/me").then(d => enter(d.username)).catch(() => { $("authView").hidden = false; });
+else $("authView").hidden = false;
+</script>
+</body>
+</html>
